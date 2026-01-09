@@ -1,0 +1,205 @@
+Real-Time Chat Application
+
+This project is a real-time chat application built with Spring Boot and WebSockets.
+It supports live messaging, persistent message storage using PostgreSQL, and automatic loading of chat history for new users.
+
+The application uses a hybrid communication approach:
+
+REST APIs are used to load previously saved messages.
+
+WebSockets (STOMP) are used for real-time message delivery.
+
+Technologies Used:
+
+Backend:
+
+Java
+Spring Boot
+Spring WebSocket (STOMP)
+Spring Data JPA
+Hibernate
+PostgreSQL
+
+Frontend:
+
+HTML
+JavaScript
+SockJS
+STOMP.js
+
+Features
+
+Real-time chat using WebSockets
+
+Persistent message storage in PostgreSQL
+
+Chat history loaded on page load
+
+Sender name and timestamps displayed for each message
+
+REST API for retrieving messages
+
+Clean layered architecture (Controller, Service, Repository)
+
+
+WebSocket Configuration
+
+WebSocket endpoint: /ws
+
+Send destination: /app/chat.send
+
+Subscribe destination: /topic/general
+
+git clone: https://github.com/Lbarchue/WebSocket_LiveChatRoom_SpringbootJava.git
+
+How to run:
+
+First - Set up Postgres database and add your databases Name, Username, and Password into application.properties
+
+Second - place the following front end text into a text editor like Notepad and save as chat.html:
+
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <title>Chat Room</title>
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                }
+                #messages {
+                    border: 1px solid #ccc;
+                    height: 300px;
+                    overflow-y: auto;
+                    padding: 10px;
+                    list-style: none;
+                }
+                #messages li {
+                    margin-bottom: 5px;
+                }
+                .timestamp {
+                    color: gray;
+                    font-size: 0.8em;
+                    margin-left: 5px;
+                }
+                .sender {
+                    font-weight: bold;
+                }
+            </style>
+        </head>
+        <body>
+
+        <h2>Chat Room</h2>
+
+        <label>
+            Username:
+            <input id="username" placeholder="Enter your name">
+        </label>
+        <br><br>
+
+        <label>
+            Message:
+            <input id="message" placeholder="Type a message">
+        </label>
+        <button onclick="sendMessage()">Send</button>
+
+        <h3>Messages</h3>
+        <ul id="messages"></ul>
+
+        <!-- SockJS + STOMP -->
+        <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+
+        <script>
+        let stompClient = null;
+
+        /* -------------------------
+           Load chat history (REST)
+        -------------------------- */
+        async function loadHistory() {
+            try {
+                const response = await fetch("http://localhost:8080/messages");
+                const messages = await response.json();
+
+                const list = document.getElementById("messages");
+                list.innerHTML = "";
+
+                messages.forEach(msg => {
+                    addMessage(msg.sender, msg.content, msg.dateStamp, msg.timeStamp);
+                });
+            } catch (err) {
+                console.error("Failed to load history", err);
+            }
+        }
+
+        /* -------------------------
+           WebSocket connection
+        -------------------------- */
+        function connect() {
+            const socket = new SockJS("http://localhost:8080/ws");
+            stompClient = Stomp.over(socket);
+
+            stompClient.connect({}, () => {
+                console.log("Connected to WebSocket");
+
+                stompClient.subscribe("/topic/general", (message) => {
+                    const msg = JSON.parse(message.body);
+                    addMessage(msg.sender, msg.content, msg.dateStamp, msg.timeStamp);
+                });
+            }, (error) => {
+                console.error("WebSocket error", error);
+            });
+        }
+
+        /* -------------------------
+           Send message
+        -------------------------- */
+        function sendMessage() {
+            if (!stompClient || !stompClient.connected) return;
+
+            const sender = document.getElementById("username").value || "Anonymous";
+            const content = document.getElementById("message").value;
+
+            if (!content.trim()) return;
+
+            stompClient.send("/app/chat.send", {}, JSON.stringify({
+                sender: sender,
+                content: content
+            }));
+
+            document.getElementById("message").value = "";
+        }
+
+        /* -------------------------
+           Helper: render message
+        -------------------------- */
+        function addMessage(sender, content, date, time) {
+            const list = document.getElementById("messages");
+            const li = document.createElement("li");
+
+            const timestamp = time ? `(${date} ${time.substring(0,5)})` : "";
+            li.innerHTML = `<span class="sender">${sender}</span>: ${content} <span class="timestamp">${timestamp}</span>`;
+
+            list.appendChild(li);
+            list.scrollTop = list.scrollHeight;
+        }
+
+        /* -------------------------
+           Start app
+        -------------------------- */
+        async function start() {
+            await loadHistory();  // Load persisted messages first
+            connect();            // Connect WebSocket second
+        }
+
+        start();
+        </script>
+
+        </body>
+        </html>
+
+Third - Make sure database is running and start application
+
+Fourth - go into file explorer where chat.html is saved and open
+
+(Make sure chat.html was saved as all files and not .txt)

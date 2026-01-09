@@ -1,0 +1,4 @@
+
+
+### Get posted messages
+GET http://localhost:8080/messages
